@@ -40,7 +40,6 @@ loss = loss_function.calculate(activation2.output,y)
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
-from matplotlib.colors import same_color
 import numpy as np
 from nnfs.datasets import spiral_data
 import matplotlib.pyplot as plt
@@ -77,7 +76,7 @@ class Layer_Dense:
 
 # ACTIVATION FUNCTIONS
 
-class Activation_ReLU:
+class Activation_ReLU():
     """
     Rectified linear activation function
     - computationaly efficient
@@ -99,7 +98,7 @@ class Activation_ReLU:
         inputs[inputs<0] = 0
         return inputs
 
-class Activation_Softmax:
+class Activation_Softmax():
     """
     This activation function gives a probability distribution over the outputs of a layer.
     - meaningful negative predictions 
@@ -115,7 +114,6 @@ class Activation_Softmax:
         self.output = probabilities
 
     # Compute derivative
-
     def prime(self, inputs):
 
         return
@@ -197,73 +195,3 @@ class Loss_CategoricalCrossentropy(Loss):
         average_loss = np.mean(y_pred_clipped, axis=0, keepdims=True)
         # geometric mean
         return average_loss
-
-
-# INITIALIZE
-CLASSES = 3
-SAMPLES = 3
-X, y = spiral_data(samples=SAMPLES, classes=CLASSES)
-
-layers = [Layer_Dense(2,5), Layer_Dense(5,CLASSES)]
-activations = [Activation_ReLU(), Activation_Softmax()]
-CCE = Loss_CategoricalCrossentropy()
-
-
-# FORWARD PASS
-for layer, activation in zip(layers, activations):
-    layer.forward(X)
-    activation.forward(layer.output)
-    X = activation.output
-print('Forward Pass - classifying {} datapoints from {} classes: \n'.format(SAMPLES*CLASSES, CLASSES), activations[-1].output)
-
-
-# BACKPROPIGATION
-
-# BP1) find error for the last layer
-# nabla_b = [print(b.shape) for b in [layer.biases for layer in layers] ]
-nabla_b = [np.zeros(b.shape) for b in (layer.biases for layer in layers) ]
-nabla_w = [np.zeros(w.shape) for w in (layer.weights for layer in layers) ]
-
-
-# delta defines the error in layer l
-delta = CCE.backward(activations[-1].output, y)
-print('Calculating average Loss for {} examples:\n'.format(SAMPLES*CLASSES), delta, end='\n\n')
-
-# WHEN NOT USING SOFTMAX AND CCE
-# sigma_prime = activations[-1].prime
-# print('cost', cost.backward(activations[-1].output, y))
-
-# delta = cost.backward(activations[-1].output, y) * sigma_prime(layers[-1].output)
-
-# BP3,BP4)
-mean = np.mean(activations[-2].output, axis=0, keepdims=True)
-
-nabla_b[-1][:] = delta
-nabla_w[-1][:] = np.dot(mean.transpose(), delta)
-
-
-# BP2) move the error backward throught the layers
-for l in range(2, len(layers)+1):
-    z = layers[-l].output
-    sigma_prime = np.mean(activations[-l].prime(z), axis=0)
-    # print(sigma_prime)
-
-    delta = np.array(delta).flatten()
-    delta = np.dot(layers[-l+1].weights, delta) * sigma_prime
-    # print('delta', delta)
-
-    nabla_b[-l][:] = delta
-    mean = np.mean(activations[-l].output, axis=0)
-    nabla_w[-l][:] = np.dot(mean.transpose(), delta)
-print('nabla_b', nabla_b)
-print('nabla_w', nabla_w)
-
-# print("data points: \n", X)
-# print("z_l1: \n", dense1.output)
-# print("a_l1: \n", activation1.output)
-
-
-
-# PLOT data
-# plt.scatter(X[:,0], X[:,1], c=y)
-# plt.show()

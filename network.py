@@ -1,5 +1,5 @@
 from nn import *
-
+import sys
 
 class Network:
     def __init__(self, hidden_layers, classes):
@@ -75,8 +75,10 @@ class Network:
 
 # INITIALIZE
 CLASSES = 3
-SAMPLES = 3
-X, y = spiral_data(samples=SAMPLES, classes=CLASSES)
+SAMPLES = 1000
+X, y = spiral_data(SAMPLES, CLASSES)
+plt.scatter(X[:,0], X[:,1], c=y)
+plt.title('{} classes {} datapoints'.format(CLASSES, CLASSES*SAMPLES))
 
 network = Network([5], CLASSES)
 
@@ -85,3 +87,7 @@ network.forward(X)
 print('Forward Pass - classifying {} datapoints from {} classes: \n'.format(SAMPLES*CLASSES, CLASSES), network.output)
 
 network.backprop()
+
+
+sys.stdout.flush()
+plt.show()
