@@ -5,12 +5,19 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import torch
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
 # Define relevant variables for the ML task
 batch_size = 64
 num_classes = 10
 learning_rate = 0.01
 num_epochs = 35
+classes = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+           'dog', 'frog', 'horse', 'ship', 'truck']
 
 
 # Device will determine whether to run the training on GPU or CPU
@@ -42,7 +49,7 @@ train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
 
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
                                           batch_size=batch_size,
-                                          shuffle=True)
+                                          shuffle=False)
 
 class ConvNeuralNet(nn.Module):
 # Determine what layers and their order in CNN object
@@ -93,48 +100,71 @@ criterion = nn.CrossEntropyLoss()
 # Set optimizer with optimizer
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, weight_decay=0.0005, momentum=0.9)
 
-
-
-total_step = len(train_loader)
-model.train()
 # training
-for epoch in range(num_epochs):
-# data loaded in batches using train_loader
-    for i, (images, labels) in enumerate(train_loader):
-        # Move tensors to the configured device
-        images, labels = images.to(device), labels.to(device)
+def train():
+    total_step = len(train_loader)
+    model.train()
+    for epoch in range(num_epochs):
+    # data loaded in batches using train_loader
+        for i, (images, labels) in enumerate(train_loader):
+            # Move tensors to the configured device
+            images, labels = images.to(device), labels.to(device)
 
-        # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+            # Forward pass
+            outputs = model(images)
+            loss = criterion(outputs, labels)
 
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
+            # Backward and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch + 1, num_epochs, loss.item()))
+    torch.save(model.state_dict(), 'model_weights.pth')
 
 # testing
-model.eval()
-with torch.no_grad():
-    correctTrain = 0
-    totalTrain = 0
-    correctTest = 0
-    totalTest = 0
-    for images, labels in train_loader:
-        images = images.to(device)
-        labels = labels.to(device)
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        totalTrain += labels.size(0)
-        correctTrain += (predicted == labels).sum().item()
-    for images, labels in test_loader:
-        images = images.to(device)
-        labels = labels.to(device)
-        outputs = model(images)
-        _, predicted = torch.max(outputs.data, 1)
-        totalTest += labels.size(0)
-        correctTest += (predicted == labels).sum().item()
+def test():
+    model.load_state_dict(torch.load('model_weights.pth'))
+    model.eval()
+    with torch.no_grad():
+        correctTrain = 0
+        totalTrain = 0
+        correctTest = 0
+        totalTest = 0
+        y_true = []
+        y_pred = []
+        for images, labels in train_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            totalTrain += labels.size(0)
+            correctTrain += (predicted == labels).sum().item()
+        for images, labels in test_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            y_true.extend(labels.cpu().numpy())
+            y_pred.extend(predicted.cpu().numpy())
+            totalTest += labels.size(0)
+            correctTest += (predicted == labels).sum().item()
 
-    print('Accuracy of the network on the {} train images: {} %'.format(50000, 100 * correctTrain / totalTrain ))
-    print('Accuracy of the network on the {} test images: {} %'.format(10000, 100 * correctTest / totalTest))
+        print('Accuracy of the network on the {} train images: {} %'.format(50000, 100 * correctTrain / totalTrain ))
+        print('Accuracy of the network on the {} test images: {} %'.format(10000, accuracy_score(y_true, y_pred)*100))
+
+        #show precision, recall, f1 score
+        print(classification_report(y_true, y_pred, target_names=classes))
+
+        #visual of confusion matrix
+        cm = confusion_matrix(y_true, y_pred)
+        cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        plt.figure(figsize=(10, 10))
+        sns.heatmap(cm_normalized, annot=True, fmt=".2f", cmap="Blues", xticklabels=classes, yticklabels=classes)
+        plt.xlabel("Predicted")
+        plt.ylabel("Actual")
+        plt.title("Confusion Matrix")
+        plt.show()
+
+# can comment out train to when you just want to test
+train()
+test()
