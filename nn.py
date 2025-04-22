@@ -1,3 +1,6 @@
+from abc import ABC, abstractmethod
+import numpy as np
+
 """
 Module: neural_network
 ======================
@@ -36,13 +39,6 @@ activation.forward(dense1.output)
 loss_function = Loss_CategoricalCrossentropy()
 loss = loss_function.calculate(activation2.output,y)
 """
-
-from abc import ABC, abstractmethod
-from typing import ClassVar
-
-import numpy as np
-from nnfs.datasets import spiral_data
-import matplotlib.pyplot as plt
 
 
 class Layer_Dense:
@@ -115,7 +111,6 @@ class Activation_Softmax():
 
     # Compute derivative
     def prime(self, inputs):
-
         return
 
 class Loss(ABC):
@@ -135,7 +130,7 @@ class Loss(ABC):
         y      -- ground truth values
         """
         sample_losses = self.backward(output, y)
-        data_loss = np.mean(sample_losses)
+        data_loss = np.mean(sample_losses, axis=0, keepdims=True)
         return data_loss
 
     @abstractmethod
@@ -175,23 +170,13 @@ class Loss_CategoricalCrossentropy(Loss):
 
 
         if len(y_true.shape) == 1: # not one-hot encoded
-            correct_confidences = y_pred_clipped[range(samples), y_true]
+            y_pred_clipped = y_pred_clipped*-1
+            y_pred_clipped[range(samples), y_true] = 1+y_pred_clipped[range(samples), y_true]
+            # accound for the 'hot' prediction only
+            # y_pred_clipped[range(samples), y_true] = 1-y_pred_clipped[range(samples), y_true]
         elif len(y_true.shape) == 2:
             correct_confidences = np.sum(y_pred_clipped*y_true, axis=1)
         else: return [-1]
 
-        # print(y_pred)
-        # print(y_pred_clipped)
-        # print(correct_confidences)
-
-        # account for all predictions
-        y_pred_clipped = y_pred_clipped*-1
-        y_pred_clipped[range(samples), y_true] = 1+y_pred_clipped[range(samples), y_true]
-
-        # y_pred_clipped[range(samples), y_true] = 1-y_pred_clipped[range(samples), y_true]
-
-        print('Predicted loss:\n', y_pred_clipped)
-
-        average_loss = np.mean(y_pred_clipped, axis=0, keepdims=True)
-        # geometric mean
-        return average_loss
+        # print('Predicted loss:\n', y_pred_clipped)
+        return y_pred_clipped

@@ -1,27 +1,43 @@
+from numpy import void
 from nn import *
 import sys
 
 class Network:
-    def __init__(self, hidden_layers, classes):
+    def __init__(self, inputs, hidden_layers, classes):
         """
         hidden_layers -- tuple representing the amount of neurons in each hidden layer
         classes -- how many classes to clasify
         """
-        # input layer
-        self.layers = [Layer_Dense(2, hidden_layers[0])]
+        # INPUT LAYER
+        self.layers = [Layer_Dense(inputs, hidden_layers[0])]
         self.activations: list = [Activation_ReLU()]
-        # hidden layers
-        for i in range(1, len(hidden_layers) -1): # different activation on the last layer
+        # HIDDEN LAYERS
+        for i in range(1, len(hidden_layers)):
             self.layers.append(Layer_Dense(hidden_layers[i-1], hidden_layers[i]))
             self.activations.append(Activation_ReLU())
-        # output layer
+        # OUTPUT LAYER
         # probablility distribution over the number of classes
         self.layers.append(Layer_Dense(hidden_layers[-1], classes))
         self.activations.append(Activation_Softmax())
-
+        # LOSS
         self.CCE = Loss_CategoricalCrossentropy()
+        self.loss = 1
 
-        print(self.layers)
+    def get_weights(self):
+        """returns a list of the networks weights"""
+        flattened = []
+        for layer in self.layers:
+            for weight_matrix in layer.weights:
+                for weight in np.ravel(weight_matrix):
+                    flattened.append(weight)
+        return np.array(flattened)
+    def get_biases(self):
+        """returns a list of the networks biases"""
+        flattened = []
+        for layer in self.layers:
+            for bias in layer.biases:
+                flattened.append(bias)
+        return np.array(flattened)
 
     def forward(self, X):
         for layer, activation in zip(self.layers, self.activations):
@@ -30,7 +46,47 @@ class Network:
             X = activation.output
         self.output = self.activations[-1].output
 
-    def backprop(self):
+    def train(self, X, y, batch_size, axloss=void):
+        xlen, ylen = len(X), len(y)
+        if xlen != ylen:
+            return -1
+
+        for e in np.arange(0, xlen, batch_size):
+            self.forward(X[e:e+batch_size])
+            self.update(y[e:e+batch_size], -1*self.loss)
+            if (e % 100 == 0):
+                print('LOSS', self.loss)
+                sys.stdout.flush()
+
+    def update(self, y_true, eta):
+        """Update the network's weights and biases by applying
+        gradient descent using backpropagation to a single mini batch.
+        The "mini_batch" is a list of ground truth values 'y', and "eta"
+        is the learning rate"""
+
+        weights = [layer.weights for layer in self.layers]
+        biases = [layer.biases for layer in self.layers]
+
+        nabla_b = [np.zeros(b.shape) for b in biases]
+        nabla_w = [np.zeros(w.shape) for w in weights]
+
+        delta_nabla_b, delta_nabla_w = self.backprop(self.output, y_true)
+        nabla_b = [nb+dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
+        nabla_w = [nw+dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+
+        for i in range(len(weights)):
+            weights[i] -= eta/len(y_true) * nabla_w[i]
+        for i in range(len(biases)):
+            biases[i] -= eta/len(y_true) *  nabla_b[i]
+
+        # weights = [w-(eta/len(batch))*nw
+        #                 for w, nw in zip(weights, nabla_w)]
+        # biases = [b-(eta/len(batch))*nb
+        #                 for b, nb in zip(biases, nabla_b)]
+
+    def backprop(self, x, y):
+        """Calculates the gradient of the loss function aka, how much each weight and bias in the network
+        impacts the final prediction"""
         # BP1) find error for the last layer
         # nabla_b = [print(b.shape) for b in [layer.biases for layer in layers] ]
         nabla_b = [np.zeros(b.shape) for b in (layer.biases for layer in self.layers) ]
@@ -38,8 +94,8 @@ class Network:
 
 
         # delta defines the error in layer l
-        delta = self.CCE.backward(self.output, y)
-        print('Calculating average Loss for {} examples:\n'.format(SAMPLES*CLASSES), delta, end='\n\n')
+        delta = self.CCE.derivative(x, y)
+        # print('Calculating average Loss for {} examples:\n'.format(SAMPLES*CLASSES), delta, end='\n\n')
 
         # WHEN NOT USING SOFTMAX AND CCE
         # sigma_prime = activations[-1].prime
@@ -54,7 +110,7 @@ class Network:
         nabla_w[-1][:] = np.dot(mean.transpose(), delta)
 
 
-        # BP2) move the error backward throught the layers
+        # BP2) move the error backward through the layers
         for l in range(2, len(self.layers)+1):
             z = self.layers[-l].output
             sigma_prime = np.mean(self.activations[-l].prime(z), axis=0)
@@ -69,25 +125,11 @@ class Network:
             nabla_w[-l][:] = np.dot(mean.transpose(), delta)
         # print('nabla_b', nabla_b)
         # print('nabla_w', nabla_w)
+
+        self.loss = self.CCE.calculate(self.output, y)
         return (nabla_b, nabla_w)
 
 
 
-# INITIALIZE
-CLASSES = 3
-SAMPLES = 1000
-X, y = spiral_data(SAMPLES, CLASSES)
-plt.scatter(X[:,0], X[:,1], c=y)
-plt.title('{} classes {} datapoints'.format(CLASSES, CLASSES*SAMPLES))
-
-network = Network([5], CLASSES)
 
 
-network.forward(X)
-print('Forward Pass - classifying {} datapoints from {} classes: \n'.format(SAMPLES*CLASSES, CLASSES), network.output)
-
-network.backprop()
-
-
-sys.stdout.flush()
-plt.show()
