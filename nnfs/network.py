@@ -16,28 +16,11 @@ class Network:
             self.layers.append(Layer_Dense(hidden_layers[i-1], hidden_layers[i]))
             self.activations.append(Activation_ReLU())
         # OUTPUT LAYER
-        # probablility distribution over the number of classes
         self.layers.append(Layer_Dense(hidden_layers[-1], classes))
         self.activations.append(Activation_Softmax())
         # LOSS
         self.CCE = Loss_CategoricalCrossentropy()
         self.loss = 1
-
-    def get_weights(self):
-        """returns a list of the networks weights"""
-        flattened = []
-        for layer in self.layers:
-            for weight_matrix in layer.weights:
-                for weight in np.ravel(weight_matrix):
-                    flattened.append(weight)
-        return np.array(flattened)
-    def get_biases(self):
-        """returns a list of the networks biases"""
-        flattened = []
-        for layer in self.layers:
-            for bias in layer.biases:
-                flattened.append(bias)
-        return np.array(flattened)
 
     def forward(self, X):
         for layer, activation in zip(self.layers, self.activations):
@@ -47,11 +30,12 @@ class Network:
         self.output = self.activations[-1].output
 
     def train(self, X, y, batch_size, axloss=void):
-        xlen, ylen = len(X), len(y)
-        if xlen != ylen:
+        """updates the weights and biases for all these sweet sweet training examples"""
+        Xlen, ylen = len(X), len(y)
+        if Xlen != ylen:
             return -1
 
-        for e in np.arange(0, xlen, batch_size):
+        for e in np.arange(0, Xlen-batch_size, batch_size):
             self.forward(X[e:e+batch_size])
             self.update(y[e:e+batch_size], -1*self.loss)
             if (e % 100 == 0):
@@ -77,7 +61,7 @@ class Network:
         for i in range(len(weights)):
             weights[i] -= eta/len(y_true) * nabla_w[i]
         for i in range(len(biases)):
-            biases[i] -= eta/len(y_true) *  nabla_b[i]
+            biases[i] -= eta/len(y_true) * nabla_b[i]
 
         # weights = [w-(eta/len(batch))*nw
         #                 for w, nw in zip(weights, nabla_w)]
@@ -95,7 +79,7 @@ class Network:
 
         # delta defines the error in layer l
         delta = self.CCE.derivative(x, y)
-        # print('Calculating average Loss for {} examples:\n'.format(SAMPLES*CLASSES), delta, end='\n\n')
+
 
         # WHEN NOT USING SOFTMAX AND CCE
         # sigma_prime = activations[-1].prime
@@ -129,7 +113,21 @@ class Network:
         self.loss = self.CCE.calculate(self.output, y)
         return (nabla_b, nabla_w)
 
-
+    def get_weights(self):
+        """returns a list of the networks weights"""
+        flattened = []
+        for layer in self.layers:
+            for weight_matrix in layer.weights:
+                for weight in np.ravel(weight_matrix):
+                    flattened.append(weight)
+        return np.array(flattened)
+    def get_biases(self):
+        """returns a list of the networks biases"""
+        flattened = []
+        for layer in self.layers:
+            for bias in layer.biases:
+                flattened.append(bias)
+        return np.array(flattened)
 
 
 
